@@ -3,7 +3,8 @@ import zmq
 import cv2
 import numpy as np
 import re
-from pprint import pprint
+import zmq_utils
+
 from visual import *
 
 # ZMQ setup
@@ -76,35 +77,6 @@ def screen_mm_to_px(gaze_pos_mm):
     return gaze_pos_mm + vector(-27, 4, 0) / 27.0 * 1080
 
 
-def parse_3d_pts(data_string):
-    return [[float(x.translate(None, '[]')) for x in s.split(', ')] for s in data_string.split(';')]
-
-
-def parse_2d_pts(data_string):
-    pts_2d = [float(x.translate(None, '[]')) for x in data_string.split(',')]
-    return zip(pts_2d[:len(pts_2d)/2], pts_2d[len(pts_2d)/2:])
-
-
-def parse_floats(data_string):
-    return [float(x.translate(None, '[]')) for x in data_string.split(',')]
-
-
-def parse_pts_msg(data_string, center=False):
-
-    datas = data_string.split('][')
-
-    params_global = parse_floats(datas[0])
-    face_pts_3d = parse_3d_pts(datas[1])
-    face_pts_2d = parse_2d_pts(datas[2])
-    eye0_pts_3d = parse_3d_pts(datas[5])
-    eye0_pts_2d = parse_2d_pts(datas[6])
-    eye1_pts_3d = parse_3d_pts(datas[3])
-    eye1_pts_2d = parse_2d_pts(datas[4])
-
-    return params_global, face_pts_3d, face_pts_2d,\
-           eye0_pts_3d, eye0_pts_2d, eye1_pts_3d, eye1_pts_2d
-
-
 def split_up_eye_pts(pts):
 
     iris_pts = pts[:8]
@@ -114,10 +86,8 @@ def split_up_eye_pts(pts):
     return iris_pts, lids_pts, pupil_pts
 
 
-
 while True:
 
-    print 'waiting...'
     data_img = socket_img.recv()
     data_pts = socket_pts.recv()
 
@@ -126,10 +96,10 @@ while True:
     frame = frame.reshape((600,800,3))
 
     # parse pts data
-    params_global, face_pts_3d, face_pts_2d, \
-    eye0_pts_3d, eye0_pts_2d, eye1_pts_3d, eye1_pts_2d = parse_pts_msg(data_pts)
+    pose, face_pts_3d, face_pts_2d, \
+        eye0_pts_3d, eye0_pts_2d, eye1_pts_3d, eye1_pts_2d = zmq_utils.parse_pts_msg(data_pts)
 
-    Tx, Ty, Tz, Eul_x, Eul_y, Eul_z = params_global
+    Tx, Ty, Tz, Eul_x, Eul_y, Eul_z = pose
 
     rot_mat = cv2.Rodrigues(np.array([Eul_x, Eul_y, Eul_z]))[0]
 
@@ -143,13 +113,6 @@ while True:
     for pt in face_pts_2d[:36]:
         cv2.circle(frame, tuple([int(p) for p in pt]), 3, 0, -1)
         cv2.circle(frame, tuple([int(p) for p in pt]), 2, (255,255,255), -1)
-
-    # draw 2d eye pts
-    # for pt in eye0_iris_pts_2d + eye1_iris_pts_2d:
-    #     cv2.circle(frame, tuple([int(p) for p in pt]), 2, (0,0,255), -1)
-    #
-    # for pt in eye0_lids_pts_2d + eye1_lids_pts_2d:
-    #     cv2.circle(frame, tuple([int(p) for p in pt]), 2, (255,0,0), -1)
 
     cv2.polylines(frame, np.array([eye0_iris_pts_2d],dtype=int), True, (0,0,255))
     cv2.polylines(frame, np.array([eye1_iris_pts_2d],dtype=int), True, (0,0,255))
@@ -189,11 +152,7 @@ while True:
 
     cv2.imshow("Frame (Python Client)", frame)
 
-
     gaze_pt_mm = np.mean(intersections, axis=0)
-    # print "%.2f,%.2f,%.2f"%tuple(gaze_pt_mm)
-
-    # print screen_mm_to_px(np.mean(intersections, axis=0))
 
     mm_to_px = np.array([[-1,  0, 0],
                          [ 0, -1, 0],
