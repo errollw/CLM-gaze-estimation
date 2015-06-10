@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 import zmq_utils
 import geom_utils
+from time import time
 
 fx, fy = 757.186370667, 757.260080183
 cx, cy = 412.671083627, 272.671560372
@@ -12,6 +13,9 @@ camera_mat = np.array([[fx, 0,  cx],
 
 socket_img, socket_pts = zmq_utils.zmq_init()
 
+f_idx = 0
+
+recording = True
 
 while True:
 
@@ -45,7 +49,7 @@ while True:
         ray_dir = pupil / float(np.linalg.norm(pupil))
 
         # position eyeball in 3d
-        offset = [0, -1, 0, 1.]
+        offset = [0, -2, 0, 1.]
         if i == 1: offset = np.array([-1, 1, 1, 1]) * offset
         eyeball_offset = pose_transform.dot(np.array(offset))
         eyeball_3d_pos = (np.array(face.pts_3d[36+i*6])+np.array(face.pts_3d[39+i*6]))/2.0 + eyeball_offset[:3]
@@ -91,6 +95,8 @@ while True:
 
     cv2.imshow("Frame (Python Client)", frame)
 
+    if recording: cv2.imwrite("vid_imgs/%d.jpg"%f_idx, frame)
+    f_idx += 1
 
     key = cv2.waitKey(1) & 0xFF
     if key == ord('q'):

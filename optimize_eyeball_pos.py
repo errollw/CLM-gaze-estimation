@@ -76,6 +76,7 @@ def mean_error(offset_vector):
 
         x = get_target_gaze_pos(pt)
         y = calc_gaze_pos(face, eye0, eye1, offset_vector)
+        # y = [1920/2, 1080/2]
 
         errors.append(np.linalg.norm(x-y))
 
@@ -83,6 +84,8 @@ def mean_error(offset_vector):
 
 pkl_fns = [f for f in os.listdir(path) if f.endswith('.pkl')]
 
-pkl_fns = [fn for fn in pkl_fns if int(pickle.load(open(os.path.join(path, fn)))[0]) < 7]
+pkl_fns = [fn for fn in pkl_fns if int(pickle.load(open(os.path.join(path, fn)))[0]) !== 1]
 
-print scipy.optimize.fmin_bfgs(mean_error, [0.0, 0.0, 0.0, 1.0])
+# print scipy.optimize.fmin_bfgs(mean_error, [0.0, 0.0, 0.0, 1.0])
+
+print mean_error([0,-2,0,1])
