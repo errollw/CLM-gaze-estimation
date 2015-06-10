@@ -1,3 +1,6 @@
+import zmq
+from clm_utils import FaceModel, EyeModel
+
 
 def parse_3d_pts(data_string):
     return [[float(x.translate(None, '[]')) for x in s.split(', ')] for s in data_string.split(';')]
@@ -14,15 +17,28 @@ def parse_floats(data_string):
 
 def parse_pts_msg(data_string, center=False):
 
-    datas = data_string.split('][')
+    ds = data_string.split('][')
 
-    pose = parse_floats(datas[0])
-    face_pts_3d = parse_3d_pts(datas[1])
-    face_pts_2d = parse_2d_pts(datas[2])
-    eye0_pts_3d = parse_3d_pts(datas[5])
-    eye0_pts_2d = parse_2d_pts(datas[6])
-    eye1_pts_3d = parse_3d_pts(datas[3])
-    eye1_pts_2d = parse_2d_pts(datas[4])
+    face = FaceModel(parse_3d_pts(ds[1]), parse_2d_pts(ds[2]), parse_floats(ds[0]))
+    eye0 = EyeModel(parse_3d_pts(ds[5]), parse_2d_pts(ds[6]))
+    eye1 = EyeModel(parse_3d_pts(ds[3]), parse_2d_pts(ds[4]))
 
-    return pose, face_pts_3d, face_pts_2d,\
-           eye0_pts_3d, eye0_pts_2d, eye1_pts_3d, eye1_pts_2d
+    return face, eye0, eye1
+
+
+def zmq_init():
+
+    # ZMQ setup
+    context = zmq.Context()
+
+    # socket to receive image
+    socket_img = context.socket(zmq.SUB)
+    socket_img.connect("tcp://localhost:5555")
+    socket_img.setsockopt_string(zmq.SUBSCRIBE, unicode(''))
+
+    # socket to receive data
+    socket_pts = context.socket(zmq.SUB)
+    socket_pts.connect("tcp://localhost:5556")
+    socket_pts.setsockopt_string(zmq.SUBSCRIBE, unicode(''))
+
+    return socket_img, socket_pts
