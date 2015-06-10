@@ -1,11 +1,8 @@
 import zmq
 import cv2
 import numpy as np
-import re
 import zmq_utils
 import geom_utils
-
-socket_img, socket_pts = zmq_utils.zmq_init()
 
 fx, fy = 757.186370667, 757.260080183
 cx, cy = 412.671083627, 272.671560372
@@ -48,7 +45,9 @@ while True:
         ray_dir = pupil / float(np.linalg.norm(pupil))
 
         # position eyeball in 3d
-        eyeball_offset = pose_transform.dot(np.array([0, -2, 0, 1]))
+        offset = [0, -1, 0, 1.]
+        if i == 1: offset = np.array([-1, 1, 1, 1]) * offset
+        eyeball_offset = pose_transform.dot(np.array(offset))
         eyeball_3d_pos = (np.array(face.pts_3d[36+i*6])+np.array(face.pts_3d[39+i*6]))/2.0 + eyeball_offset[:3]
 
         try:
@@ -85,6 +84,7 @@ while True:
 
         print gaze_pt_px
 
+        cv2.circle(screen_vis, tuple(gaze_pt_px[:2].astype(int)), 40, [128]*3, -1)
         cv2.circle(screen_vis, tuple(gaze_pt_px[:2].astype(int)), 4, [255]*3, -1)
 
         frame[10:10+100, 10:10+160] = screen_vis
@@ -93,9 +93,8 @@ while True:
 
 
     key = cv2.waitKey(1) & 0xFF
-    # if key == ord('q'):
-    #     cv2.destroyAllWindows()
-    #     video.release()
-    #     break
+    if key == ord('q'):
+        cv2.destroyAllWindows()
+        break
 
 
