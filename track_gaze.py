@@ -15,7 +15,7 @@ socket_img, socket_pts = zmq_utils.zmq_init()
 
 f_idx = 0
 
-recording = True
+recording = False
 
 while True:
 
@@ -25,6 +25,7 @@ while True:
     # parse image data
     frame = np.fromstring(data_img, dtype='uint8')
     frame = frame.reshape((600, 800, 3))
+    frame_copy = frame.copy()
 
     # parse scene data
     face, eye0, eye1 = zmq_utils.parse_pts_msg(data_pts)
@@ -49,13 +50,14 @@ while True:
         ray_dir = pupil / float(np.linalg.norm(pupil))
 
         # position eyeball in 3d
-        offset = [0, -2, 0, 1.]
+        #[ 1.26128993 -2.2593072   3.70121942  6.11718562]
+        offset = [0, -2, 0, 11]
         if i == 1: offset = np.array([-1, 1, 1, 1]) * offset
         eyeball_offset = pose_transform.dot(np.array(offset))
         eyeball_3d_pos = (np.array(face.pts_3d[36+i*6])+np.array(face.pts_3d[39+i*6]))/2.0 + eyeball_offset[:3]
 
         try:
-            P = geom_utils.ray_sphere_intersect((0,0,0), ray_dir, eyeball_3d_pos, 12)
+            P = geom_utils.ray_sphere_intersect((0,0,0), ray_dir, eyeball_3d_pos, 6.11)
         except geom_utils.NoIntersection:
             continue
 
@@ -86,8 +88,6 @@ while True:
 
         gaze_pt_px = mm_to_px.dot(gaze_pt_mm) + np.array([160/2.0, 0, 0])
 
-        print gaze_pt_px
-
         cv2.circle(screen_vis, tuple(gaze_pt_px[:2].astype(int)), 40, [128]*3, -1)
         cv2.circle(screen_vis, tuple(gaze_pt_px[:2].astype(int)), 4, [255]*3, -1)
 
@@ -102,5 +102,7 @@ while True:
     if key == ord('q'):
         cv2.destroyAllWindows()
         break
-
+    if key == ord('s'):
+        cv2.imwrite("vid_imgs/A_%d.png"%f_idx,frame)
+        cv2.imwrite("vid_imgs/B_%d.png"%f_idx,frame_copy)
 
