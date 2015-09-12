@@ -1,5 +1,5 @@
-
-# from visual import *
+import numpy as np
+from visual import *
 
 # for swapping between OpenCV and VPython coordinates
 coord_swap = np.array([[1,0,0],[0,-1,0],[0,0,-1]])
@@ -20,3 +20,10 @@ coord_swap = np.array([[1,0,0],[0,-1,0],[0,0,-1]])
 # position 3d face pts
 # for i, pt in enumerate(face_pts_3d):
 #     face_spheres_3d[i].pos = coord_swap.dot(np.array(pt).T)
+
+def visualize(pts_3d, radius=1, color=color.white):
+
+    scene.autocenter = True
+
+    for pt in pts_3d:
+        sphere(pos=coord_swap.dot(np.array(pt)), radius=radius, color=color, opacity=0.5)

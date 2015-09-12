@@ -1,19 +1,33 @@
 import zmq
 import cv2
+import os
+import pickle
 import numpy as np
 import zmq_utils
 import geom_utils
+import visualize
 from time import time
 
-fx, fy = 757.186370667, 757.260080183
-cx, cy = 412.671083627, 272.671560372
-camera_mat = np.array([[fx, 0,  cx],
-                       [0,  fy, cy],
-                       [0,  0,  0]], dtype=float)
+cam_mat = np.array([[749.9999,   0.0000,   400.0000],
+                    [0.0000,   749.9999,   300.0000],
+                    [0.0000,     0.0000,   1.0000]])
 
 socket_img, socket_pts = zmq_utils.zmq_init()
 
 f_idx = 0
+
+def dehomo(vector):
+    return vector[:-1]/vector[-1]
+
+dir, fn = "ground_truth_3d", "1434636738"
+img = cv2.imread(os.path.join(dir, "%s.png"%fn))
+truth_data = pickle.load(open(os.path.join(dir, "%s.pkl"%fn), "rb"))
+
+coord_swap = np.array([[1,0,0],[0,-1,0],[0,0,-1]])
+
+true_iris_centre_3d = np.mean(truth_data["ldmks_iris_3d"], axis=0)*100
+gaze_dir = true_iris_centre_3d-np.array(truth_data["eye_centre_3d"])*100
+gaze_dir /= np.linalg.norm(gaze_dir)
 
 recording = False
 
@@ -51,7 +65,7 @@ while True:
 
         # position eyeball in 3d
         #[ 1.26128993 -2.2593072   3.70121942  6.11718562]
-        offset = [0, -2, 0, 1]
+        offset = [0, 0, 0, 1]
         if i == 1: offset = np.array([-1, 1, 1, 1]) * offset
         eyeball_offset = pose_transform.dot(np.array(offset))
         eyeball_3d_pos = (np.array(face.pts_3d[36+i*6])+np.array(face.pts_3d[39+i*6]))/2.0 + eyeball_offset[:3]
@@ -69,11 +83,25 @@ while True:
 
         pts, _ = cv2.projectPoints(np.array([gaze_pt_3d_0, gaze_pt_3d_1]),
                                    np.eye(3, dtype=float),
-                                   np.array([0, 0, 0], dtype=float), camera_mat, None)
+                                   np.array([0, 0, 0], dtype=float), cam_mat, None)
 
         cv2.line(frame,
                  tuple(np.array(pts[0], int).squeeze()),
                  tuple(np.array(pts[1], int).squeeze()), (0,0,255))
+
+        if i==1:
+            print coord_swap.dot(np.array(truth_data["eye_centre_3d"])*100), eyeball_3d_pos
+
+            pt = cam_mat.dot(coord_swap.dot(truth_data["eye_centre_3d"])*100)
+            cv2.circle(frame, tuple(dehomo(pt).astype(int)), 2, (255, 255, 255))
+
+            pt = cam_mat.dot(eyeball_3d_pos)
+            cv2.circle(frame, tuple(dehomo(pt).astype(int)), 2, (128, 128, 128), -1)
+
+            cv2.line(frame,
+                     tuple(dehomo(cam_mat.dot(coord_swap.dot(true_iris_centre_3d))).astype(int)),
+                     tuple(dehomo(cam_mat.dot(coord_swap.dot(true_iris_centre_3d+gaze_dir*50))).astype(int)),
+                     (0,255,255))
 
         # calculate screen intersection
         intersections.append(geom_utils.ray_screen_intersect(eyeball_3d_pos, gaze_vec_3d_axis))
@@ -103,6 +131,5 @@ while True:
         cv2.destroyAllWindows()
         break
     if key == ord('s'):
-        cv2.imwrite("vid_imgs/A_%d.png"%f_idx,frame)
-        cv2.imwrite("vid_imgs/B_%d.png"%f_idx,frame_copy)
+        pickle.dump([face, eye0, eye1], open(os.path.join(dir, "clm_%s.pkl"%fn), "wb"))
 
